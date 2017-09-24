@@ -7,6 +7,7 @@ from hachoir_core.cmd_line import unicodeFilename
 from hachoir_parser import createParser
 
 import time
+import sys
 import re
 import os
 
@@ -33,10 +34,15 @@ class Add_Movie_Tree:
 			loop_file_type = None
 			if os.path.isdir(loop_file_path):
 				loop_file_type = "directory"
-
-			new_node = tree.insert(parent, 'end', text=loop_file, values=[loop_file_path, loop_file_type])
-			if os.path.isdir(loop_file_path):
-				self.fill_tree(new_node, loop_file_path, tree) #recurse if loop_file is a directory
+			try:
+				new_node = tree.insert(parent, 'end', text=loop_file, values=[loop_file_path, loop_file_type])
+			except UnicodeDecodeError:
+				pass
+			try:
+				if os.path.isdir(loop_file_path):
+					self.fill_tree(new_node, loop_file_path, tree) #recurse if loop_file is a directory
+			except UnboundLocalError:
+				print "Unbound Local Error: node referenced before assignment"
 
 	def on_double_click(self, event, top_level, frame, metadata):
 		tree = event.widget #get the tree widget used in the double click event
@@ -126,29 +132,33 @@ def read_metadata():
 			metadata.append(get_metadata(lines)) #retrieve metadata
 		except UnboundLocalError: #catch if file not video
 			print "File Error: hachoir could not parse file" + os.path.basename(os.path.normpath(lines))
+		except hachoir_core.stream.input.InputStreamError:
+			print "Error: Line Break in metadata.txt"
 	return metadata
 
 def make_labels(frame):
 	data = read_metadata()
-	metadata_tree = ttk.Treeview(frame, columns=(), displaycolumns="")
-	metadata_tree.column("#0", width=0)
-	metadata_tree.bind("<Button-1>", on_label_selection)
-	for metadata in data:
-		metadata_tree.insert("","end", text=metadata["title"], values=(), open=False)
-	metadata_tree.pack(side=LEFT, expand=True, fill="both")
+	movieList = Listbox(frame, bd=0)
+	for index, metadata in enumerate(data):
+		movieList.insert(index, metadata["title"])
+	movieList.grid()
 
 def update_labels(frame):
-	frame_children = frame.winfo_children()
-	for widget in frame_children:
-		if widget.widgetName == "ttk::treeview":
-			widget.destroy()
-	make_labels(frame)
+	data = read_metadata()
+	list_of_widgets = frame.winfo_children()
+	movieList = None
+	for wid in list_of_widgets:
+		if wid.winfo_class() == "Listbox":
+			movieList = wid
+	movieList.delete(0, END)
+	for index, metadata in enumerate(data):
+		movieList.insert(index, metadata["title"])
 
 def on_label_selection(event):
 	print "foo"
 
 def add_movie(frame):
-	path = os.getcwd()
+	path = os.path.join( os.path.dirname( __file__ ), '..' )
 	tree = Add_Movie_Tree(frame, path)
 
 def delete_movie():
@@ -178,7 +188,6 @@ if __name__ == "__main__":
 
 	#working with movies
 	make_labels(frame)
-	update_labels(frame)
 	metadata = read_metadata()
 
 	for i in  range(0, len(metadata)):
