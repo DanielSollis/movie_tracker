@@ -7,7 +7,6 @@ from hachoir_core.cmd_line import unicodeFilename
 from hachoir_parser import createParser
 
 import time
-import sys
 import re
 import os
 
@@ -36,13 +35,12 @@ class Add_Movie_Tree:
 				loop_file_type = "directory"
 			try:
 				new_node = tree.insert(parent, 'end', text=loop_file, values=[loop_file_path, loop_file_type])
-			except UnicodeDecodeError:
-				pass
-			try:
 				if os.path.isdir(loop_file_path):
 					self.fill_tree(new_node, loop_file_path, tree) #recurse if loop_file is a directory
 			except UnboundLocalError:
 				print "Unbound Local Error: node referenced before assignment"
+			except UnicodeDecodeError:
+				print "Could Not Read File: " + loop_file
 
 	def on_double_click(self, event, top_level, frame, metadata):
 		tree = event.widget #get the tree widget used in the double click event
