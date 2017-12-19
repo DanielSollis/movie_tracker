@@ -1,10 +1,13 @@
 from PyQt5.QtWidgets import QWidget, QLabel, QApplication, QGridLayout, QMainWindow, QAction, \
-    QTreeView, QFileSystemModel
+    QTreeView, QFileSystemModel, QTableWidget, QTableWidgetItem
 from PyQt5 import QtCore
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import *
 
 from hachoir_metadata import extractMetadata
 from hachoir_parser import createParser
+
+import MySQLdb
+from password import passwd
 
 import time
 import re
@@ -25,12 +28,10 @@ class Qt_window(QMainWindow):
         self.setWindowTitle("Movie Tracker")
         self.set_grid_layout(self.grid)
         self.create_menu_bar()
-        self.create_clock()
+        self.initialize_movie_table_from_db()
         self.show()
 
     def set_grid_layout(self, grid):
-        grid.setColumnStretch(0, 3)
-        grid.setColumnStretch(1, 1)
         grid.setRowStretch(0, 100)
         grid.setRowStretch(1, 1)
         self.main_window.setLayout(grid)
@@ -48,24 +49,35 @@ class Qt_window(QMainWindow):
         fizzbuzz_action.triggered.connect(self.fizz_buzz)
         edit_menu.addAction(fizzbuzz_action)
 
-    # def create_clock(self):
-    #     clock = QLabel()
-    #     clock.setText("Time:")
-    #     clock.setAlignment(QtCore.Qt.AlignRight)
-    #     self.grid.addWidget(clock, 1, 1)
-    #     timer = QTimer()
-    #     timer.timeout.connect(self.clock_tick(clock))
-    #     timer.start(1000)
-
-    def clock_tick(self, clock):
-        current_time = "Time: " + time.strftime('%H:%M:%S %p')
-        current_clock = clock.text()
-        if current_clock != current_time:
-            clock.setText(current_time)
-
     def create_tree(self):
-        path = os.path.join(os.path.dirname(__file__), '..')
-        self.tree = Add_Movie_Tree(path, self.pos())
+        self.path = os.path.join(os.path.dirname(__file__), '..')
+        self.tree = Add_Movie_Tree(self.path, self.pos())
+
+    def initialize_movie_table_from_db(self):
+        cur = self.retrieve_movies_from_db()
+        movie_table = self.setup_movie_table(cur)
+        self.create_movie_table(movie_table, cur)
+
+    def retrieve_movies_from_db(self):
+        db = MySQLdb.connect(host="localhost", user="root", passwd=passwd, db="movie_tracker")
+        cur = db.cursor()
+        cur.execute("SELECT * FROM movies")
+        return cur
+
+    def setup_movie_table(self, cur):
+        movie_table = QTableWidget(self)
+        movie_table.setColumnCount(4)
+        movie_table.setHorizontalHeaderLabels(["Title", "Duration", "Resolution", "File Type"])
+        movie_table.setRowCount(cur.rowcount)
+        return movie_table
+
+    def create_movie_table(self, movie_table, cur):
+        for index, mov in enumerate(cur.fetchall()):
+            movie_table.setItem(index,0, QTableWidgetItem(mov[0]))
+            movie_table.setItem(index,1, QTableWidgetItem(mov[1]))
+            movie_table.setItem(index,2, QTableWidgetItem(mov[2]))
+            movie_table.setItem(index,3, QTableWidgetItem(mov[3]))
+        self.grid.addWidget(movie_table, 0, 0)
 
     def fizz_buzz(self):
         for i in range(1, 101):
@@ -89,6 +101,7 @@ class Add_Movie_Tree(QWidget):
         self.setGeometry(625, 375, 550, 350)
         self.create_tree()
         self.set_layout()
+        self.show()
 
     def create_tree(self):
         self.model = QFileSystemModel()
@@ -101,21 +114,29 @@ class Add_Movie_Tree(QWidget):
         layout = QGridLayout(self)
         layout.addWidget(self.tree)
         self.setLayout(layout)
-        self.show()
 
     @QtCore.pyqtSlot(QtCore.QModelIndex)
     def file_selected(self, index):
         selected_index = self.model.index(index.row(), 0, index.parent())
-        file_name = self.model.fileName(selected_index)
         file_path = self.model.filePath(selected_index)
-        if (os.path.isdir(file_path) is not True):
-            metadata = get_metadata(file_path)
-            print metadata
+        if os.path.isdir(file_path) is not True:
+            self.add_movie_to_database(file_path)
+            self.close()
+
+    def add_movie_to_database(self, file_path):
+        metadata = get_metadata(file_path)
+        db = MySQLdb.connect(host = "localhost", user = "root", passwd = passwd, db = "movie_tracker")
+        cur = db.cursor()
+        cur.execute("""INSERT INTO movies (Title,Duration,Resolution,Extension,path) VALUES (%s,%s,%s,%s,%s);""",
+            (metadata['title'], metadata['duration'], metadata['resolution'], metadata['extension'], metadata['path']))
+        db.commit()
+        db.close()
 
 def get_metadata(path):
     parser = createParser(path)
     extract_metadata = extractMetadata(parser)
     metadata_text = str(extract_metadata).split("\n")
+
     resolution_height = ""
     resolution_width = ""
     metadata = {}
@@ -136,6 +157,7 @@ def get_metadata(path):
     metadata['resolution'] = resolution_width + ' X ' + resolution_height
     metadata['title'] = os.path.basename(os.path.normpath(path)).replace("_", ' ').title().split(".")[0]
     metadata['extension'] = os.path.basename(os.path.normpath(path)).split(".")[1].strip("\n")
+    metadata['path'] = path
 
     return metadata
 
