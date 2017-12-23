@@ -1,10 +1,11 @@
-from PyQt5.QtWidgets import *
-from PyQt5 import QtCore
+from Add_Movie_Tree import *
+from Delete_Movie_List import *
+from password import passwd
 
+from PyQt5.QtWidgets import *
 from hachoir_metadata import extractMetadata
 from hachoir_parser import createParser
 import MySQLdb
-from password import passwd
 import re
 import os
 import sys
@@ -74,21 +75,29 @@ class Qt_window(QMainWindow):
 
     def initialize_movie_table_from_db(self):
         cur = self.retrieve_movies_from_db()
-        empty_movie_table = self.create_movie_table(cur)
-        self.movie_table = self.fill_movie_table(empty_movie_table, cur)
+        self.movie_table = self.create_movie_table(cur)
+        self.fill_movie_table(self.movie_table, cur)
         self.grid.addWidget(self.movie_table, 0, 0)
 
     def create_movie_table(self, cur):
         movie_table = QTableWidget(self)
+        self.set_movie_table_layout(movie_table, cur)
+        self.set_movie_table_selection_behaviour(movie_table)
+        return movie_table
+
+    def set_movie_table_layout(self, movie_table, cur):
         movie_table.setColumnCount(4)
         movie_table.setRowCount(cur.rowcount)
         movie_table.setColumnWidth(0, 313)
         movie_table.setHorizontalHeaderLabels(["Title", "Duration", "Resolution", "File Type"])
         movie_table.verticalHeader().hide()
-        movie_table.setSelectionMode(movie_table.NoSelection)
-        movie_table.setEditTriggers(movie_table.NoEditTriggers)
-        movie_table.setFocusPolicy(QtCore.Qt.NoFocus)
         movie_table.setShowGrid(False)
+        return movie_table
+
+    def set_movie_table_selection_behaviour(self, movie_table):
+        movie_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        movie_table.setSelectionMode(QAbstractItemView.SingleSelection)
+        movie_table.setEditTriggers(movie_table.NoEditTriggers)
         return movie_table
 
     def fill_movie_table(self, movie_table, cur):
@@ -99,86 +108,10 @@ class Qt_window(QMainWindow):
             movie_table.setItem(index,3, QTableWidgetItem(mov[3]))
         return movie_table
 
-class Add_Movie_Tree(QDialog):
-    def __init__(self, path, frame):
-        super(Add_Movie_Tree, self).__init__()
-        self.path = path
-        self.tree = QTreeView()
-        self.model = QFileSystemModel()
-        self.initUI()
-
-    def initUI(self):
-        self.setGeometry(625, 375, 550, 350)
-        self.create_tree()
-        self.set_layout()
-        self.exec_()
-
-    def create_tree(self):
-        self.model.setRootPath(self.path)
-        self.tree.setModel(self.model)
-        self.tree.setRootIndex(self.model.index(self.path))
-        self.tree.doubleClicked.connect(self.file_selected)
-        self.tree.setColumnWidth(0, 200)
-
-    def set_layout(self):
-        layout = QGridLayout(self)
-        layout.addWidget(self.tree)
-        self.setLayout(layout)
-
-    @QtCore.pyqtSlot(QtCore.QModelIndex)
-    def file_selected(self, index):
-        selected_index = self.model.index(index.row(), 0, index.parent())
-        file_path = self.model.filePath(selected_index)
-        if os.path.isdir(file_path) is not True:
-            self.add_movie_to_database(file_path)
-            self.close()
-
-    def add_movie_to_database(self, file_path):
-        metadata = get_metadata(file_path)
-        db = MySQLdb.connect(host = "localhost", user = "root", passwd = passwd, db = "movie_tracker")
-        cur = db.cursor()
-        cur.execute("INSERT INTO movies (Title,Duration,Resolution,Extension,path) VALUES (%s,%s,%s,%s,%s);",
-            (metadata['title'], metadata['duration'], metadata['resolution'], metadata['extension'], metadata['path']))
-        db.commit()
-        db.close()
-
-class Delete_Movie_List(QDialog):
-    def __init__(self, frame):
-        super(Delete_Movie_List, self).__init__()
-        self.movie_list = QListWidget()
-        self.fill_movie_list_from_db()
-        self.movie_list.doubleClicked.connect(lambda: self.file_selected())
-        self.setup_layout()
-        self.exec_()
-
-    def fill_movie_list_from_db(self):
-        db = MySQLdb.connect(host="localhost", user="root", passwd=passwd, db="movie_tracker")
-        cur = db.cursor()
-        cur.execute("SELECT * FROM movies")
-        for index, mov in enumerate(cur.fetchall()):
-            self.movie_list.insertItem(index, mov[0])
-        db.close()
-
-    def setup_layout(self):
-        self.setGeometry(625, 375, 200, 250)
-        layout = QGridLayout(self)
-        layout.addWidget(self.movie_list)
-        self.setLayout(layout)
-
-    def file_selected(self):
-        db = MySQLdb.connect(host="localhost", user="root", passwd=passwd, db="movie_tracker")
-        selected_item = self.movie_list.currentItem().text()
-        cur = db.cursor()
-        cur.execute("DELETE FROM movies WHERE Title = '%s';" % selected_item)
-        db.commit()
-        db.close()
-        self.close()
-
 def get_metadata(path):
     parser = createParser(path)
     extract_metadata = extractMetadata(parser)
     metadata_text = str(extract_metadata).split("\n")
-
     resolution_height = ""
     resolution_width = ""
     metadata = {}
@@ -190,7 +123,7 @@ def get_metadata(path):
             metadata['duration'] = re.sub("Duration: ", "", metadata_duration)
         elif re.search(r'Image width:', lines) is not None:
             metadata_width = re.search(r'width: (.*$)', lines).group(0)
-            metadata['width'] = metadata_width
+            metadata['width'] = re.search(r'width: (.*$)', lines).group(0)
             resolution_width = re.sub('pixels', "", re.search(r'\d.*', metadata_width).group(0)).strip()
         elif re.search(r'Image height:', lines) is not None:
             metadata_height = re.search(r'height: (.*$)', lines).group(0)
