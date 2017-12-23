@@ -1,11 +1,9 @@
 from Add_Movie_Tree import *
 from Delete_Movie_List import *
-from password import passwd
-
+from Movie_Table import *
 from PyQt5.QtWidgets import *
 from hachoir_metadata import extractMetadata
 from hachoir_parser import createParser
-import MySQLdb
 import re
 import os
 import sys
@@ -24,7 +22,7 @@ class Qt_window(QMainWindow):
         self.setWindowTitle("Movie Tracker")
         self.set_grid_layout(self.grid)
         self.create_menu_bar()
-        self.initialize_movie_table_from_db()
+        self.movie_table = Movie_Table(self.grid)
         self.show()
 
     def set_grid_layout(self, grid):
@@ -35,14 +33,12 @@ class Qt_window(QMainWindow):
     def create_menu_bar(self):
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("File")
-        edit_menu = menu_bar.addMenu("Edit")
         self.create_add_movie_action(file_menu)
         self.create_delete_movie_action(file_menu)
 
-        #placeholder action
-        fizzbuzz_action = QAction("FIZZBUZZ", self)
-        fizzbuzz_action.triggered.connect(fizz_buzz)
-        edit_menu.addAction(fizzbuzz_action)
+    def create_movie_table(self):
+        movie_table = Movie_Table(self.grid)
+        return movie_table
 
     def create_add_movie_action(self, file_menu):
         add_movie_action = QAction("Add Movie", self)
@@ -57,56 +53,16 @@ class Qt_window(QMainWindow):
 
     def create_add_movie_tree(self):
         path = os.path.join(os.path.dirname(__file__), '..')
-        Add_Movie_Tree(path, self.pos())
+        add_movie_tree = Add_Movie_Tree(path, self.pos())
+        add_movie_tree.exec_()
         self.movie_table.destroy()
-        self.initialize_movie_table_from_db()
+        self.create_movie_table()
 
     def create_delete_movie_list(self):
-        Delete_Movie_List(self)
+        delete_movie_list = Delete_Movie_List(self)
+        delete_movie_list.exec_()
         self.movie_table.destroy()
-        self.initialize_movie_table_from_db()
-
-    def retrieve_movies_from_db(self):
-        db = MySQLdb.connect(host="localhost", user="root", passwd=passwd, db="movie_tracker")
-        cur = db.cursor()
-        cur.execute("SELECT * FROM movies")
-        db.close()
-        return cur
-
-    def initialize_movie_table_from_db(self):
-        cur = self.retrieve_movies_from_db()
-        self.movie_table = self.create_movie_table(cur)
-        self.fill_movie_table(self.movie_table, cur)
-        self.grid.addWidget(self.movie_table, 0, 0)
-
-    def create_movie_table(self, cur):
-        movie_table = QTableWidget(self)
-        self.set_movie_table_layout(movie_table, cur)
-        self.set_movie_table_selection_behaviour(movie_table)
-        return movie_table
-
-    def set_movie_table_layout(self, movie_table, cur):
-        movie_table.setColumnCount(4)
-        movie_table.setRowCount(cur.rowcount)
-        movie_table.setColumnWidth(0, 313)
-        movie_table.setHorizontalHeaderLabels(["Title", "Duration", "Resolution", "File Type"])
-        movie_table.verticalHeader().hide()
-        movie_table.setShowGrid(False)
-        return movie_table
-
-    def set_movie_table_selection_behaviour(self, movie_table):
-        movie_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        movie_table.setSelectionMode(QAbstractItemView.SingleSelection)
-        movie_table.setEditTriggers(movie_table.NoEditTriggers)
-        return movie_table
-
-    def fill_movie_table(self, movie_table, cur):
-        for index, mov in enumerate(cur.fetchall()):
-            movie_table.setItem(index,0, QTableWidgetItem(mov[0]))
-            movie_table.setItem(index,1, QTableWidgetItem(mov[1]))
-            movie_table.setItem(index,2, QTableWidgetItem(mov[2]))
-            movie_table.setItem(index,3, QTableWidgetItem(mov[3]))
-        return movie_table
+        self.create_movie_table()
 
 def get_metadata(path):
     parser = createParser(path)
@@ -135,18 +91,6 @@ def get_metadata(path):
     metadata['path'] = path
 
     return metadata
-
-#placeholder function
-def fizz_buzz():
-    for i in range(1, 101):
-        if i % 3 == 0 and i % 5 == 0:
-            print "FIZZBUZZ!"
-        elif i % 3 == 0:
-            print "FIZZ"
-        elif i % 5 == 0:
-            print "BUZZ"
-        else:
-            print i
 
 if __name__ == "__main__":
     q_app = QApplication(sys.argv)

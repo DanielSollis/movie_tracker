@@ -17,7 +17,6 @@ class Add_Movie_Tree(QDialog):
         self.setGeometry(625, 375, 550, 350)
         self.create_tree()
         self.set_layout()
-        self.exec_()
 
     def create_tree(self):
         self.model.setRootPath(self.path)

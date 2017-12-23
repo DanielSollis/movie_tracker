@@ -11,7 +11,6 @@ class Delete_Movie_List(QDialog):
         self.fill_movie_list_from_db()
         self.movie_list.doubleClicked.connect(lambda: self.file_selected())
         self.setup_layout()
-        self.exec_()
 
     def fill_movie_list_from_db(self):
         db = MySQLdb.connect(host="localhost", user="root", passwd=passwd, db="movie_tracker")
