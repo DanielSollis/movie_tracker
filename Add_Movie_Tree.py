@@ -1,8 +1,6 @@
 from PyQt5.QtWidgets import *
 from PyQt5 import QtCore
-from movie_trackerQt import get_metadata
-from password import passwd
-import MySQLdb
+from movie_trackerQt import add_movie_to_database
 import os
 
 class Add_Movie_Tree(QDialog):
@@ -35,14 +33,5 @@ class Add_Movie_Tree(QDialog):
         selected_index = self.model.index(index.row(), 0, index.parent())
         file_path = self.model.filePath(selected_index)
         if os.path.isdir(file_path) is not True:
-            self.add_movie_to_database(file_path)
+            add_movie_to_database(file_path)
             self.close()
-
-    def add_movie_to_database(self, file_path):
-        metadata = get_metadata(file_path)
-        db = MySQLdb.connect(host = "localhost", user = "root", passwd = passwd, db = "movie_tracker")
-        cur = db.cursor()
-        cur.execute("INSERT INTO movies (Title,Duration,Resolution,Extension,path) VALUES (%s,%s,%s,%s,%s);",
-            (metadata['title'], metadata['duration'], metadata['resolution'], metadata['extension'], metadata['path']))
-        db.commit()
-        db.close()

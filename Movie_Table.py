@@ -1,50 +1,52 @@
-from PyQt5.QtWidgets import QWidget, \
-                            QTableWidget, \
+from PyQt5.QtWidgets import QTableWidget, \
                             QAbstractItemView, \
                             QTableWidgetItem
-from password import passwd
-import MySQLdb
+import movie_trackerQt
 
-class Movie_Table(QWidget):
-    def __init__(self, grid):
+class Movie_Table(QTableWidget):
+    def __init__(self):
         super(Movie_Table, self).__init__()
-        cur = self.retrieve_movies_from_db()
-        self.movie_table = self.create_movie_table(cur)
-        self.fill_movie_table(self.movie_table, cur)
-        grid.addWidget(self.movie_table, 0, 0)
+        cur = movie_trackerQt.retrieve_movies_from_db()
+        self.set_layout(cur)
+        self.set_selection_behavior()
+        self.setAcceptDrops(True)
 
-    def create_movie_table(self, cur):
-        movie_table = QTableWidget()
-        self.set_movie_table_layout(movie_table, cur)
-        self.set_movie_table_selection_behaviour(movie_table)
-        return movie_table
+    def set_layout(self, cur):
+        self.setColumnCount(4)
+        self.setRowCount(cur.rowcount)
+        self.setColumnWidth(0, 313)
+        self.setHorizontalHeaderLabels(["Title", "Duration", "Resolution", "File Type"])
+        self.verticalHeader().hide()
+        self.setShowGrid(False)
 
-    def set_movie_table_layout(self, movie_table, cur):
-        movie_table.setColumnCount(4)
-        movie_table.setRowCount(cur.rowcount)
-        movie_table.setColumnWidth(0, 313)
-        movie_table.setHorizontalHeaderLabels(["Title", "Duration", "Resolution", "File Type"])
-        movie_table.verticalHeader().hide()
-        movie_table.setShowGrid(False)
-        return movie_table
+    def set_selection_behavior(self):
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.setEditTriggers(self.NoEditTriggers)
 
-    def set_movie_table_selection_behaviour(self, movie_table):
-        movie_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        movie_table.setSelectionMode(QAbstractItemView.SingleSelection)
-        movie_table.setEditTriggers(movie_table.NoEditTriggers)
-        return movie_table
-
-    def fill_movie_table(self, movie_table, cur):
+    def fill_movie_table(self, cur):
         for index, mov in enumerate(cur.fetchall()):
-            movie_table.setItem(index,0, QTableWidgetItem(mov[0]))
-            movie_table.setItem(index,1, QTableWidgetItem(mov[1]))
-            movie_table.setItem(index,2, QTableWidgetItem(mov[2]))
-            movie_table.setItem(index,3, QTableWidgetItem(mov[3]))
-        return movie_table
+            self.setItem(index,0, QTableWidgetItem(mov[0]))
+            self.setItem(index,1, QTableWidgetItem(mov[1]))
+            self.setItem(index,2, QTableWidgetItem(mov[2]))
+            self.setItem(index,3, QTableWidgetItem(mov[3]))
 
-    def retrieve_movies_from_db(self):
-        db = MySQLdb.connect(host="localhost", user="root", passwd=passwd, db="movie_tracker")
-        cur = db.cursor()
-        cur.execute("SELECT * FROM movies")
-        db.close()
-        return cur
+    def update_table_contents(self):
+        for row in reversed(range(self.rowCount())):
+            self.removeRow(row)
+        cur = movie_trackerQt.retrieve_movies_from_db()
+        self.setRowCount(cur.rowcount)
+        self.fill_movie_table(cur)
+
+    def dragEnterEvent(self, e):
+        if e.mimeData().hasUrls():
+            e.accept()
+
+    def dragMoveEvent(self, e):
+        e.accept()
+
+    def dropEvent(self, e):
+        for file in e.mimeData().urls():
+            path = file.toLocalFile()
+            movie_trackerQt.add_movie_to_database(path)
+            self.update_table_contents()
