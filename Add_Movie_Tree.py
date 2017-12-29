@@ -1,4 +1,7 @@
-from PyQt5.QtWidgets import *
+from PyQt5.QtWidgets import QTreeView, \
+                            QFileSystemModel, \
+                            QDialog, \
+                            QGridLayout
 from PyQt5 import QtCore
 from movie_trackerQt import add_movie_to_database
 import os
@@ -33,5 +36,6 @@ class Add_Movie_Tree(QDialog):
         selected_index = self.model.index(index.row(), 0, index.parent())
         file_path = self.model.filePath(selected_index)
         if os.path.isdir(file_path) is not True:
-            add_movie_to_database(file_path)
-            self.close()
+            result = add_movie_to_database(file_path)
+            if result is True:
+                self.close()

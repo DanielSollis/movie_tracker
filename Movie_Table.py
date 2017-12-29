@@ -1,12 +1,12 @@
 from PyQt5.QtWidgets import QTableWidget, \
                             QAbstractItemView, \
                             QTableWidgetItem
-import movie_trackerQt
+from Database_Functions import *
 
 class Movie_Table(QTableWidget):
     def __init__(self):
         super(Movie_Table, self).__init__()
-        cur = movie_trackerQt.retrieve_movies_from_db()
+        cur = retrieve_movies_from_db()
         self.set_layout(cur)
         self.set_selection_behavior()
         self.setAcceptDrops(True)
@@ -34,7 +34,7 @@ class Movie_Table(QTableWidget):
     def update_table_contents(self):
         for row in reversed(range(self.rowCount())):
             self.removeRow(row)
-        cur = movie_trackerQt.retrieve_movies_from_db()
+        cur = retrieve_movies_from_db()
         self.setRowCount(cur.rowcount)
         self.fill_movie_table(cur)
 
@@ -48,5 +48,5 @@ class Movie_Table(QTableWidget):
     def dropEvent(self, e):
         for file in e.mimeData().urls():
             path = file.toLocalFile()
-            movie_trackerQt.add_movie_to_database(path)
+            add_movie_to_database(path)
             self.update_table_contents()
